@@ -7,6 +7,7 @@ import torch
 import torch as th
 import torch.nn as nn
 from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -295,6 +296,152 @@ env_kwargs = {
 
 
 # ==================================
+#      Evaluation Metrics
+# ==================================
+
+# this callback runs during training and keeps track of when the policy
+# first hits a target average reward - that's our learning efficiency metric
+class LearningEfficiencyCallback(BaseCallback):
+    def __init__(self, target_reward=15.0, window=10, verbose=0):
+        super().__init__(verbose)
+        self.target_reward = target_reward
+        self.window = window
+        # timestep where we crossed the target for the first time
+        self.reached_at = None
+        self._ep_rewards = []
+        self._cur_ep_reward = 0.0
+
+    def _on_step(self):
+        rewards = self.locals.get("rewards", [])
+        dones = self.locals.get("dones", [])
+        for r, d in zip(rewards, dones):
+            self._cur_ep_reward += r
+            if d:
+                self._ep_rewards.append(self._cur_ep_reward)
+                self._cur_ep_reward = 0.0
+                # only start checking once we have enough episodes for a rolling avg
+                if self.reached_at is None and len(self._ep_rewards) >= self.window:
+                    rolling_avg = np.mean(self._ep_rewards[-self.window:])
+                    if rolling_avg >= self.target_reward:
+                        self.reached_at = self.num_timesteps
+        return True
+
+
+def run_eval_episodes(model, env, n_episodes, dt):
+    # runs the model for n_episodes and collects all the metrics
+    all_cumulative_rewards = []
+    all_avg_speeds = []
+    all_lane_deviations = []
+    all_jerks = []
+    all_distances = []
+    n_collisions = 0
+    n_successes = 0
+
+    for ep in range(n_episodes):
+        obs, info = env.reset()
+        done = truncated = False
+
+        ep_reward = 0.0
+        ep_speeds = []
+        ep_lane_devs = []
+        ep_jerks = []
+        ep_distance = 0.0
+        prev_speed = None
+        crashed = False
+
+        while not (done or truncated):
+            action, _ = model.predict(obs)
+            obs, reward, done, truncated, info = env.step(action)
+
+            ep_reward += reward
+
+            if info.get("crashed", False):
+                crashed = True
+
+            # speed comes straight from the info dict (m/s)
+            speed = info.get("speed", 0.0)
+            ep_speeds.append(speed)
+
+            # distance = speed * time per step
+            ep_distance += speed * dt
+
+            # lateral deviation from lane center - how far off-center the agent is
+            try:
+                veh = env.unwrapped.vehicle
+                _, lat = veh.lane.local_coordinates(veh.position)
+                ep_lane_devs.append(abs(lat))
+            except Exception:
+                ep_lane_devs.append(0.0)
+
+            # jerk = rate of change of speed (proxy for smoothness of driving)
+            # high jerk = sudden braking/accelerating = bad driving
+            if prev_speed is not None:
+                ep_jerks.append(abs(speed - prev_speed) / dt)
+            prev_speed = speed
+
+            env.render()
+
+        all_cumulative_rewards.append(ep_reward)
+        all_avg_speeds.append(np.mean(ep_speeds) if ep_speeds else 0.0)
+        all_lane_deviations.append(np.mean(ep_lane_devs) if ep_lane_devs else 0.0)
+        all_jerks.append(np.mean(ep_jerks) if ep_jerks else 0.0)
+        all_distances.append(ep_distance)
+
+        if crashed:
+            n_collisions += 1
+        else:
+            n_successes += 1
+
+        print(f"  Episode {ep + 1}/{n_episodes} | reward={ep_reward:.2f} | "
+              f"crashed={crashed} | dist={ep_distance:.1f}m")
+
+    results = {
+        "cumulative_reward_mean": np.mean(all_cumulative_rewards),
+        "cumulative_reward_std": np.std(all_cumulative_rewards),
+        "collision_rate": n_collisions / n_episodes,
+        "success_rate": n_successes / n_episodes,
+        "avg_speed_mean": np.mean(all_avg_speeds),
+        "lane_deviation_mean": np.mean(all_lane_deviations),
+        "jerk_mean": np.mean(all_jerks),
+        "driving_distance_mean": np.mean(all_distances),
+    }
+    return results
+
+
+def print_metrics(results, learning_eff_ts, target_reward):
+    sep = "-" * 52
+    print(f"\n{sep}")
+    print("   Baseline Model — Evaluation Metrics Summary")
+    print(sep)
+
+    # cumulative reward tells us overall how well the policy is doing
+    print(f"  Cumulative Reward       : {results['cumulative_reward_mean']:.2f}"
+          f" ± {results['cumulative_reward_std']:.2f}")
+
+    # learning efficiency - how many env steps before the policy got good
+    if learning_eff_ts is not None:
+        print(f"  Learning Efficiency     : hit target reward ({target_reward}) "
+              f"at {learning_eff_ts:,} timesteps")
+    else:
+        print(f"  Learning Efficiency     : target reward ({target_reward}) "
+              f"not reached during training")
+
+    print(f"  Collision Rate          : {results['collision_rate'] * 100:.1f}%")
+    print(f"  Success Rate            : {results['success_rate'] * 100:.1f}%")
+
+    # lane deviation in meters - lower is better
+    print(f"  Lane Deviation (mean)   : {results['lane_deviation_mean']:.3f} m")
+
+    print(f"  Average Speed           : {results['avg_speed_mean']:.2f} m/s")
+
+    # jerk is |Δspeed| / dt per step - smoother driving = lower jerk
+    print(f"  Jerk (mean)             : {results['jerk_mean']:.3f} m/s²")
+
+    print(f"  Driving Distance (mean) : {results['driving_distance_mean']:.1f} m")
+    print(sep)
+
+
+# ==================================
 #        Display attention matrix
 # ==================================
 
@@ -370,6 +517,11 @@ def compute_vehicles_attention(env, model):
 
 if __name__ == "__main__":
     train = True
+
+    # reward threshold used to measure learning efficiency
+    target_reward = 15.0
+    eff_callback = LearningEfficiencyCallback(target_reward=target_reward, window=10)
+
     if train:
         n_cpu = 4
         policy_kwargs = dict(
@@ -394,7 +546,7 @@ if __name__ == "__main__":
             tensorboard_log="highway_attention_ppo/",
         )
         # Train the agent
-        model.learn(total_timesteps=200 * 1000)
+        model.learn(total_timesteps=200 * 1000, callback=eff_callback)
         # Save the agent
         model.save("highway_attention_ppo/model")
 
@@ -404,10 +556,11 @@ if __name__ == "__main__":
     env.viewer.set_agent_display(
         functools.partial(display_vehicles_attention, env=env, model=model)
     )
-    for _ in range(5):
-        obs, info = env.reset()
-        done = truncated = False
-        while not (done or truncated):
-            action, _ = model.predict(obs)
-            obs, reward, done, truncated, info = env.step(action)
-            env.render()
+
+    # dt = seconds per policy step, needed for distance and jerk calculations
+    dt = 1.0 / env_kwargs["config"]["policy_frequency"]
+    n_eval_episodes = 5
+
+    print("\nRunning evaluation episodes...")
+    results = run_eval_episodes(model, env, n_eval_episodes, dt)
+    print_metrics(results, eff_callback.reached_at, target_reward)

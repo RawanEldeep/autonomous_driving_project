@@ -1,0 +1,19 @@
+# virtual environment
+venv/
+
+# trained model weights and tensorboard logs
+highway_attention_ppo/
+
+# experiment outputs
+experiments/
+
+# python cache
+__pycache__/
+*.py[cod]
+
+# jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# os junk
+.DS_Store
+Thumbs.db
