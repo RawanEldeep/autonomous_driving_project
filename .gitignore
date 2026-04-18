@@ -6,6 +6,10 @@
 enhanced_ppo_logs/
 highway_attention_ppo/
 
+# Ablation study — skip intermediate checkpoints and TensorBoard logs
+ablation_logs/*_ckpts/
+ablation_logs/*_tb/
+
 # Evaluation results and plots
 results/
 
