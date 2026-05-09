@@ -78,6 +78,7 @@
         <br/>
         <div class="img-container" align="center">
           <img src="resources/images/environment.png" class="img-fluid text-center">
+          <p><em>Highway Environment - Single Timestep: the green vehicle is the ego agent, blue vehicles are surrounding traffic.</em></p>
         </div>
         <br/>
       </div>
@@ -96,7 +97,8 @@
 
         <br/>
         <div class="img-container" align="center">
-          <img src="resources/images/input_output.png" class="img-fluid text-center">
+          <img src="resources/images/flow_diagram.png" class="img-fluid text-center">
+          <p><em>Agent Flow: Observation matrix &rarr; PPO Agent (Transformer) &rarr; Action</em></p>
         </div>
         <br/>
       </div>
@@ -108,18 +110,25 @@
         <h2 class="mt-5">State of the art</h2>
 
         <p>
-          State-of-the-art DRL approaches for autonomous highway driving include:
+          State-of-the-art DRL approaches for autonomous highway driving were surveyed across four main algorithms:
         </p>
-        <ul>
-          <li><strong>DQN:</strong> value-based, discrete actions, prone to instability in continuous environments</li>
-          <li><strong>DDPG:</strong> off-policy actor-critic, continuous control, sensitive to hyperparameters</li>
-          <li><strong>SAC (IEDF-SAC variant):</strong> achieved reward of 403.30 with 1.5% collision rate vs baseline SAC reward of 365.85 with 18.83% collision rate</li>
-          <li><strong>PPO:</strong> on-policy actor-critic, stable convergence, strong performance in highway-env</li>
-        </ul>
+        <p>
+          <strong>PPO (On-policy Actor-Critic):</strong> Achieved an average lane-change success rate of 94.5% with an extremely low collision rate in highway-env, outperforming DQN, SAC, and DDPG in reward stability and convergence. This was a key factor in selecting PPO as our baseline.
+        </p>
+        <p>
+          <strong>DQN (Value-based):</strong> Applied to highway driving using a hybrid structure where DQN handles high-level lane decisions executed through a trajectory planner. Achieved 100% completion rate in overtaking scenarios and 0% collision rate in on-coming traffic scenarios.
+        </p>
+        <p>
+          <strong>SAC &mdash; IEDF-SAC variant (Off-policy Actor-Critic):</strong> Achieved a reward of 403.30 with 1.5% collision rate compared to baseline SAC with 365.85 reward and 18.83% collision rate.
+        </p>
+        <p>
+          <strong>DDPG (Off-policy Actor-Critic, Continuous Control):</strong> Applied in the TORCS simulator, showed stable driving behavior and competitive performance in overtaking scenarios.
+        </p>
 
         <br/>
         <div class="img-container" align="center">
           <img src="resources/images/sota.png" class="img-fluid text-center">
+          <p><em>Table 3: Comparison of DRL Models for Autonomous Highway Driving</em></p>
         </div>
         <br/>
       </div>
@@ -198,19 +207,74 @@
         <h2 class="mt-5">Results</h2>
 
         <p>
-          We ran an ablation study comparing all enhancements individually and in combination against the baseline. Key findings:
+          We ran a full ablation study comparing the baseline against all four enhancements individually and in combination. Key findings:
         </p>
         <ul>
-          <li><strong>Baseline:</strong> Mean Reward 54.53 &plusmn; 7.49, Collision Rate 5.0%, Success Rate 95.0%</li>
-          <li><strong>E1 (Reward Shaping):</strong> collapsed due to reward hacking</li>
-          <li><strong>E4 (Attention Regularization):</strong> best performing individual enhancement</li>
-          <li><strong>E3 (Observation Enrichment):</strong> close second</li>
-          <li><strong>All enhancements combined:</strong> underperformed individual winners due to conflicting optimization signals</li>
+          <li><strong>E4 (Attention Regularization)</strong> achieved the best performance: 0% collision rate, 100% success rate, mean reward 56.5</li>
+          <li><strong>E1 (Enhanced Reward)</strong> achieved the highest mean reward (69.9) but had a higher collision rate (5%) &mdash; indicating reward hacking behavior</li>
+          <li><strong>E2 (Dynamic Traffic)</strong> severely hurt performance: 63.3% collision rate, 36.7% success rate</li>
+          <li><strong>Combining all enhancements</strong> produced the worst overall result (73.3% collision rate, 26.7% success rate) due to conflicting optimization signals</li>
+          <li><strong>E3 + E4 Combined</strong> performed close to baseline, suggesting these two are more compatible than the full combination</li>
+        </ul>
+
+        <p><strong>Full results table:</strong></p>
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm">
+            <thead class="thead-dark">
+              <tr>
+                <th>Metric</th>
+                <th>Baseline</th>
+                <th>E1</th>
+                <th>E2</th>
+                <th>E3</th>
+                <th>E4</th>
+                <th>All</th>
+                <th>E3+E4</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Mean Reward</td><td>55.4&plusmn;5.2</td><td>69.9&plusmn;9.3</td><td>41.5&plusmn;14.2</td><td>55.2&plusmn;3.1</td><td>56.5&plusmn;1.8</td><td>40.8&plusmn;20.5</td><td>55.2&plusmn;6.5</td></tr>
+              <tr><td>Collision Rate</td><td>2.0%</td><td>5.0%</td><td>63.3%</td><td>3.3%</td><td>0.0%</td><td>73.3%</td><td>6.7%</td></tr>
+              <tr><td>Success Rate</td><td>98.0%</td><td>95.0%</td><td>36.7%</td><td>96.7%</td><td>100.0%</td><td>26.7%</td><td>93.3%</td></tr>
+              <tr><td>Mean Lane Dev (m)</td><td>0.000</td><td>0.000</td><td>0.017</td><td>0.000</td><td>0.004</td><td>0.038</td><td>0.000</td></tr>
+              <tr><td>Mean Speed (m/s)</td><td>20.05</td><td>20.05</td><td>20.02</td><td>20.05</td><td>20.05</td><td>20.06</td><td>20.05</td></tr>
+              <tr><td>Mean Jerk</td><td>0.0017</td><td>0.0023</td><td>0.0102</td><td>0.0016</td><td>0.0018</td><td>0.0169</td><td>0.0022</td></tr>
+              <tr><td>Mean Distance (m)</td><td>730</td><td>719</td><td>546</td><td>734</td><td>739</td><td>450</td><td>718</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>Learning Efficiency</strong> (timesteps to sustain mean reward &gt; 30 over 10 episodes):</p>
+        <ul>
+          <li>Baseline: 12,000 &nbsp;|&nbsp; E1: 16,000 &nbsp;|&nbsp; E2: 38,000 &nbsp;|&nbsp; E3: 101,000</li>
+          <li>E4: 54,000 &nbsp;|&nbsp; All Enhancements: 114,000 &nbsp;|&nbsp; E3+E4: 52,000</li>
         </ul>
 
         <br/>
         <div class="img-container" align="center">
-          <img src="resources/images/results.png" class="img-fluid text-center">
+          <img src="resources/images/results_reward.png" class="img-fluid text-center">
+          <p><em>Mean Episode Reward across all model variants (higher is better)</em></p>
+        </div>
+        <br/>
+
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/results_collision_success.png" class="img-fluid text-center">
+          <p><em>Collision Rate (lower is better) and Success Rate (higher is better)</em></p>
+        </div>
+        <br/>
+
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/results_learning_curves.png" class="img-fluid text-center">
+          <p><em>Learning Curves &mdash; All Runs (20-episode rolling mean)</em></p>
+        </div>
+        <br/>
+
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/results_lane_deviation.png" class="img-fluid text-center">
+          <p><em>Mean Lane Deviation in meters (lower is better)</em></p>
         </div>
         <br/>
       </div>
