@@ -1,0 +1,18 @@
+{
+  "n_episodes": 100,
+  "mean_reward": 37.385670356279476,
+  "std_reward": 19.603318052617414,
+  "min_reward": 3.9999999999999996,
+  "max_reward": 66.66666666666673,
+  "collision_rate": 67.0,
+  "success_rate": 32.99999999999999,
+  "mean_lane_deviation": 0.0,
+  "max_lane_deviation": 0.0,
+  "mean_speed": 22.390460088926297,
+  "speed_variance": 6.25283583724852,
+  "mean_jerk": 0.018356732905702246,
+  "max_jerk": 0.3139979520680243,
+  "mean_distance": 500.40200944444035,
+  "total_distance": 50040.200944444034,
+  "timesteps_to_target": null
+}

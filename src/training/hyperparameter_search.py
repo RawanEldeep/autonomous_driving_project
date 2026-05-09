@@ -23,6 +23,7 @@ Usage:
         n_configs=12,
         total_timesteps=50_000,
         log_dir="hp_search_results",
+
     )
 """
 
