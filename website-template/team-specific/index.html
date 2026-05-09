@@ -59,10 +59,10 @@
       <div class="col-lg-12 text-left">
         <h2 class="mt-5">Problem Statement</h2>
         <p>
-          Autonomous driving has emerged as one of the most transformative technologies in artificial intelligence. Despite significant progress, autonomous highway driving remains a challenging problem requiring vehicles to make continuous real-time decisions — when to accelerate, decelerate, or change lanes — in a dynamic environment with other moving vehicles, while avoiding collisions and maintaining efficient travel speed.
+          Autonomous driving is one of the most impactful technologies in AI today. Companies like Waymo, Tesla, Uber, and Cruise have already invested billions into building these systems and some of them are already deployed in real world applications like autonomous ride hailing services and self driving delivery vehicles. But despite all this progress, autonomous highway driving is still a hard problem. A vehicle needs to make continuous real time decisions about when to speed up, slow down, or change lanes while navigating through other moving vehicles, and it has to do this while avoiding collisions and keeping up with traffic flow. The challenge comes from balancing multiple competing objectives at the same time.
         </p>
         <p>
-          In this project, we train an autonomous driving agent to navigate a multi-lane highway using Deep Reinforcement Learning. The agent learns entirely through trial and error by interacting with a simulated highway environment, receiving rewards for desirable behavior such as maintaining high speed and avoiding collisions, and penalties for undesirable behavior such as crashing or driving too slowly.
+          In this project we trained an autonomous agent to navigate a multi lane highway using Deep Reinforcement Learning. The agent starts with zero knowledge about driving rules or traffic behavior. It learns entirely through trial and error by interacting with a simulated environment, getting rewarded for good behavior like maintaining speed and avoiding crashes, and penalized for bad behavior like crashing or driving too slowly. Through this process the agent develops a driving policy that works.
         </p>
       </div>
     </div>
@@ -72,7 +72,7 @@
         <h2 class="mt-5">Environment</h2>
 
         <p>
-          We use highway-env, a lightweight open-source simulation environment for autonomous driving. The agent operates on a 3-lane highway populated with 15 surrounding vehicles. At each timestep, the agent receives a Kinematics observation: a matrix of 10 vehicles &times; 7 features [presence, x, y, vx, vy, cos_h, sin_h], normalized relative to the ego vehicle. The action space is discrete with 5 actions: LANE_LEFT, IDLE, LANE_RIGHT, FASTER, SLOWER.
+          We used highway-env, a lightweight open source simulation environment for autonomous driving research. It is built with the Gymnasium API and runs fast enough to support the large number of training episodes needed for DRL. The agent drives on a 3 lane highway with 15 surrounding vehicles. At every timestep it receives a Kinematics observation which is a matrix of 10 vehicles by 7 features: presence, x, y, vx, vy, cos_h, and sin_h. All values are normalized relative to the ego vehicle. The agent then selects one of 5 discrete actions: LANE_LEFT, IDLE, LANE_RIGHT, FASTER, or SLOWER.
         </p>
 
         <br/>
@@ -89,10 +89,10 @@
         <h2 class="mt-5">Input/Output Examples</h2>
 
         <p>
-          The agent receives a 10&times;7 observation matrix representing the ego vehicle and 9 surrounding vehicles. Each row contains the vehicle's presence flag, lateral position (x), longitudinal position (y), lateral velocity (vx), longitudinal velocity (vy), and heading (cos_h, sin_h). Values are normalized relative to the ego vehicle.
+          The input to the model at every timestep is a 10 by 7 observation matrix. The first row represents the ego vehicle and the remaining 9 rows represent the nearest surrounding vehicles. Each row contains the vehicle's presence flag, its lateral position x, its longitudinal position y, its lateral velocity vx, its longitudinal velocity vy, and its heading described by cos_h and sin_h. Everything is normalized relative to the ego vehicle so the model always reasons from its own perspective.
         </p>
         <p>
-          Based on this observation, the agent outputs one of 5 discrete actions: LANE_LEFT, IDLE, LANE_RIGHT, FASTER, or SLOWER. For example, given a slow vehicle directly ahead, the agent may output LANE_RIGHT with 87% confidence to overtake safely.
+          The output is one of 5 discrete actions. For example if a slow vehicle is directly ahead in the same lane, the agent might decide to output LANE_RIGHT because through training it learned that changing lanes is the best way to maintain speed without risking a collision.
         </p>
 
         <br/>
@@ -110,19 +110,19 @@
         <h2 class="mt-5">State of the art</h2>
 
         <p>
-          State-of-the-art DRL approaches for autonomous highway driving were surveyed across four main algorithms:
+          We surveyed four main DRL algorithms that have been applied to autonomous highway driving to understand the current landscape and justify our model selection.
         </p>
         <p>
-          <strong>PPO (On-policy Actor-Critic):</strong> Achieved an average lane-change success rate of 94.5% with an extremely low collision rate in highway-env, outperforming DQN, SAC, and DDPG in reward stability and convergence. This was a key factor in selecting PPO as our baseline.
+          <strong>PPO (On-policy Actor-Critic):</strong> Achieved an average lane change success rate of 94.5% with an extremely low collision rate in highway-env and consistently outperformed DQN, SAC, and DDPG in reward stability and convergence speed. This is what led us to select PPO as our baseline.
         </p>
         <p>
-          <strong>DQN (Value-based):</strong> Applied to highway driving using a hybrid structure where DQN handles high-level lane decisions executed through a trajectory planner. Achieved 100% completion rate in overtaking scenarios and 0% collision rate in on-coming traffic scenarios.
+          <strong>DQN (Value-based):</strong> Applied using a hybrid approach where the network handles high level discrete lane decisions that are then executed through a trajectory planner. It achieved a 100% completion rate in overtaking scenarios and a 0% collision rate in oncoming traffic scenarios.
         </p>
         <p>
-          <strong>SAC &mdash; IEDF-SAC variant (Off-policy Actor-Critic):</strong> Achieved a reward of 403.30 with 1.5% collision rate compared to baseline SAC with 365.85 reward and 18.83% collision rate.
+          <strong>SAC &mdash; IEDF-SAC variant (Off-policy Actor-Critic):</strong> Achieved a reward of 403.30 with a 1.5% collision rate compared to the standard SAC baseline which got 365.85 reward with an 18.83% collision rate. A significant improvement but it operates in a different simulation environment.
         </p>
         <p>
-          <strong>DDPG (Off-policy Actor-Critic, Continuous Control):</strong> Applied in the TORCS simulator, showed stable driving behavior and competitive performance in overtaking scenarios.
+          <strong>DDPG (Off-policy Actor-Critic, Continuous Control):</strong> Tested in the TORCS simulator and demonstrated stable driving behavior and competitive overtaking performance but it is more sensitive to hyperparameter choices than PPO which adds implementation complexity.
         </p>
 
         <br/>
@@ -139,7 +139,7 @@
         <h2 class="mt-5">Orignial Model from Literature</h2>
 
         <p>
-          We selected PPO (Proximal Policy Optimization) with an Ego-Attention (Transformer) policy as our baseline, sourced from the Farama-Foundation HighwayEnv repository. The model uses a custom feature extractor (EgoAttentionNetwork) that embeds each vehicle into a 64-dimensional space, then applies a multi-head attention mechanism (2 heads, 32 features per head) where the ego vehicle queries all surrounding vehicles. The attended output is combined with the ego embedding via a residual connection and passed to PPO's policy and value heads.
+          We selected PPO with an Ego-Attention Transformer policy as our baseline. The architecture is sourced from the Farama-Foundation HighwayEnv repository. It uses a custom feature extractor called EgoAttentionNetwork that takes the observation matrix and embeds each vehicle into a 64 dimensional vector using a shared MLP with two layers of 64 units and ReLU activations. It then runs a multi head attention mechanism with 2 heads and 32 features per head where the ego vehicle acts as the query and attends over all 10 vehicles including itself. Vehicles with a presence value below 0.5 are masked out. The attended output is combined with the ego embedding through a residual connection to produce a final 64 dimensional representation. This gets passed into PPO's policy head which outputs the action distribution and a value head which estimates the state value.
         </p>
 
         <br/>
@@ -160,7 +160,7 @@
 
         <h5 class="mt-5">Update #1: Enhanced Reward Shaping (E1)</h5>
         <p>
-          The baseline reward function only delivers strong signals at critical moments such as collisions. We augmented it with near-miss penalties using Time-to-Collision (TTC) metrics, smooth driving rewards to encourage gradual acceleration, and lane-centering rewards to incentivize staying centered in the lane.
+          The baseline reward function only delivers a strong signal at extreme moments like collisions. During most of the episode the agent gets very weak feedback which slows down learning significantly. We augmented the reward with three additions: near miss penalties computed using Time to Collision metrics to discourage dangerous proximity to other vehicles, smooth driving rewards to encourage gradual acceleration and deceleration rather than jerky control, and lane centering rewards to incentivize staying in the middle of the lane rather than drifting toward edges.
         </p>
         <br/>
         <div class="img-container" align="center">
@@ -170,7 +170,7 @@
 
         <h5 class="mt-5">Update #2: Dynamic Traffic Scenarios (E2)</h5>
         <p>
-          The baseline uses a fixed density of 15 vehicles. We introduced variable traffic conditions: sparse (5&ndash;10 vehicles), moderate (15&ndash;20 vehicles), and dense (25&ndash;30 vehicles), with dynamic events such as sudden braking and aggressive lane changes sampled randomly during training.
+          The baseline always trains with exactly 15 vehicles on the road. We changed this by introducing variable traffic density across three levels: sparse with 5 to 10 vehicles representing off peak conditions, moderate with 15 to 20 matching the baseline setup, and dense with 25 to 30 representing rush hour congestion. We also added dynamic traffic events like sudden braking by leading vehicles and aggressive lane changes by surrounding cars, all sampled randomly during training so the agent is exposed to a wider range of scenarios.
         </p>
         <br/>
         <div class="img-container" align="center">
@@ -180,7 +180,7 @@
 
         <h5 class="mt-5">Update #3: Observation Enrichment (E3)</h5>
         <p>
-          We expanded the per-vehicle observation from 7 to 10 features by adding pre-computed safety-relevant features: Time-to-Collision (TTC), lateral distance (lat_dist), and lane change in progress (lc_in_progress). This gives the attention mechanism more semantically meaningful inputs.
+          The baseline observation only contains raw kinematic data. We extended each vehicle's feature vector from 7 to 10 dimensions by adding three derived safety features: Time to Collision per vehicle, lateral distance to lane boundaries, and a binary indicator for whether a lane change is currently in progress based on the heading angle. The goal is to give the attention mechanism more semantically meaningful inputs so it does not have to figure out safety relevant relationships from scratch.
         </p>
         <br/>
         <div class="img-container" align="center">
@@ -190,7 +190,7 @@
 
         <h5 class="mt-5">Update #4: Attention Entropy Regularization (E4) &mdash; Best Performing</h5>
         <p>
-          We added an auxiliary entropy penalty to the PPO training objective to regularize the ego-attention weights, discouraging both over-concentration (attending to a single vehicle exclusively) and over-diffusion (uniform attention regardless of relevance). This encourages the network to maintain structured, selective attention patterns throughout training.
+          We added an auxiliary entropy loss to the PPO training objective to regularize the ego-attention weights. Without any regularization, attention weights tend to degenerate in one of two ways: either the agent collapses attention onto a single vehicle and ignores everything else, or it spreads attention so uniformly that it cannot focus on anything relevant. Both of these patterns hurt performance. The entropy penalty keeps the attention distribution somewhere in between by penalizing both extremes, which encourages the agent to develop structured and selective attention throughout training. At inference time this regularization has no effect since it only influenced the weights during training.
         </p>
         <br/>
         <div class="img-container" align="center">
@@ -207,15 +207,23 @@
         <h2 class="mt-5">Results</h2>
 
         <p>
-          We ran a full ablation study comparing the baseline against all four enhancements individually and in combination. Key findings:
+          We ran a full ablation study where we trained and evaluated each enhancement individually and then tested combining all four together and combining just E3 with E4. Each model was trained for 200,000 timesteps under the same environment configuration and evaluated over 30 episodes.
         </p>
-        <ul>
-          <li><strong>E4 (Attention Regularization)</strong> achieved the best performance: 0% collision rate, 100% success rate, mean reward 56.5</li>
-          <li><strong>E1 (Enhanced Reward)</strong> achieved the highest mean reward (69.9) but had a higher collision rate (5%) &mdash; indicating reward hacking behavior</li>
-          <li><strong>E2 (Dynamic Traffic)</strong> severely hurt performance: 63.3% collision rate, 36.7% success rate</li>
-          <li><strong>Combining all enhancements</strong> produced the worst overall result (73.3% collision rate, 26.7% success rate) due to conflicting optimization signals</li>
-          <li><strong>E3 + E4 Combined</strong> performed close to baseline, suggesting these two are more compatible than the full combination</li>
-        </ul>
+        <p>
+          E4 is the best performing model overall. It is the only model that achieved a 0% collision rate and a perfect 100% success rate while keeping its mean reward at 56.5 which is above the baseline of 55.4. The attention entropy regularization led to more structured attention patterns which directly translated to safer and more consistent driving behavior.
+        </p>
+        <p>
+          E1 achieved the highest mean reward at 69.9 but its collision rate went up to 5% compared to the baseline's 2%. This is a classic reward hacking scenario where the agent learned to exploit the shaped reward rather than drive safely. It found ways to maximize the reward signal without actually improving its driving.
+        </p>
+        <p>
+          E2 performed the worst individually with a 63.3% collision rate and only 36.7% success rate. Introducing too much traffic variability during training destabilized the learning process instead of improving generalization.
+        </p>
+        <p>
+          E3 performed very close to the baseline across all metrics which suggests the enriched observation features did not provide enough additional signal to meaningfully change the agent's behavior in this setting.
+        </p>
+        <p>
+          Combining all four enhancements produced the worst safety results overall with a 73.3% collision rate and 26.7% success rate. Each enhancement optimizes for a different objective and stacking them all together creates conflicting gradients that prevent the agent from converging on a stable policy.
+        </p>
 
         <p><strong>Full results table:</strong></p>
         <div class="table-responsive">
@@ -305,7 +313,16 @@
         <h2 class="mt-5">Conclusion</h2>
 
         <p>
-          The ablation study demonstrated that targeted, single-objective enhancements outperform combined approaches in DRL for autonomous driving. E4 (Attention Entropy Regularization) was the strongest enhancement, producing more structured attention patterns and better driving behavior. Key lessons learned: reward design is critical and small changes cause drastic behavioral shifts; combining enhancements requires careful conflict analysis; and regularizing the attention mechanism improves both performance and interpretability. Future work includes testing on more complex environments (roundabouts, intersections) and combining E3+E4 with a carefully tuned joint reward function.
+          The main finding from this project is that targeted single objective enhancements outperform combined approaches in DRL for autonomous driving. E4 was clearly the best model we trained. It was the only one to achieve a 0% collision rate and a 100% success rate and it got there by doing something relatively focused: regularizing the attention mechanism so the agent maintains structured and selective attention throughout training rather than collapsing into degenerate patterns.
+        </p>
+        <p>
+          One of the most important things we learned is how sensitive reward design is in reinforcement learning. Small changes to the reward function can completely shift agent behavior in ways that are hard to predict. E1 is a good example of this where the agent found ways to score high on the reward without actually driving better, which is a known failure mode called reward hacking.
+        </p>
+        <p>
+          We also learned that combining multiple enhancements does not guarantee better results. Each of our enhancements pulls the optimization in a different direction and when you apply all of them at once the signals conflict and the agent struggles to learn anything useful. This suggests that if we want to combine enhancements we need to think carefully about their compatibility before training.
+        </p>
+        <p>
+          For future work we would focus on testing E4 in more complex environments like roundabouts and intersections to see how well it generalizes beyond highway scenarios. We would also want to explore combining E3 and E4 more carefully since they showed the most compatibility as a pair, and investigate whether a staged training approach could reduce the conflict between enhancements when combining them.
         </p>
 
       </div>
