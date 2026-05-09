@@ -49,7 +49,8 @@ _ENV_CONFIG = {
         "absolute": False,
     },
     "policy_frequency": 2,
-    "duration": 40,
+    "duration": 200,
+    "offscreen_rendering": True,  # render to pygame.Surface directly — no display driver needed
 }
 
 # ---------------------------------------------------------------------------
@@ -113,10 +114,27 @@ def _get_probs(obs: np.ndarray) -> list[float]:
 # Simulation loop (runs in background thread)
 # ---------------------------------------------------------------------------
 
+def _get_frame(env) -> np.ndarray:
+    """
+    highway-env creates the viewer lazily and sets viewer.enabled=False,
+    so env.render() returns a black array. Fix: force enabled=True and
+    drive the viewer directly via display() + get_image().
+    """
+    # First call to render() creates the viewer object
+    env.render()
+    v = env.unwrapped.viewer
+    v.enabled = True
+    v.display()
+    return v.get_image()
+
+
 def _simulate(stop_event: threading.Event) -> None:
     env = gym.make("highway-v0", render_mode="rgb_array")
     env.unwrapped.configure(_ENV_CONFIG)
     obs, _ = env.reset()
+
+    # Prime the viewer so it exists before the loop
+    env.render()
 
     step = 0
     cumulative_reward = 0.0
@@ -131,7 +149,7 @@ def _simulate(stop_event: threading.Event) -> None:
         step += 1
         cumulative_reward += float(reward)
 
-        frame = env.render()
+        frame = _get_frame(env)
         frame_b64 = _frame_to_b64(frame)
 
         with _lock:
@@ -150,7 +168,7 @@ def _simulate(stop_event: threading.Event) -> None:
             step = 0
             cumulative_reward = 0.0
 
-        time.sleep(0.12)  # ~8 fps
+        time.sleep(0.04)  # ~25 fps
 
     env.close()
     with _lock:
