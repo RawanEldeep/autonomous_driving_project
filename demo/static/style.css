@@ -1,0 +1,234 @@
+/* ============================================================
+   E4 Demo — Dark professional theme
+   ============================================================ */
+
+:root {
+  --bg:       #0d1117;
+  --surface:  #161b22;
+  --border:   #30363d;
+  --text:     #e6edf3;
+  --muted:    #8b949e;
+  --accent:   #58a6ff;
+  --green:    #3fb950;
+  --red:      #da3633;
+  --radius:   10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+
+header {
+  display: flex;
+  align-items: center;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.controls {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+
+button {
+  padding: 8px 22px;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+button:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
+button:disabled { opacity: 0.3; cursor: default; transform: none; }
+
+#btn-start { background: var(--green); color: #0d1117; }
+#btn-stop  { background: var(--red);   color: #fff; }
+
+/* ── Main layout ── */
+
+main {
+  flex: 1;
+  display: flex;
+  gap: 18px;
+  padding: 18px 28px;
+  overflow: hidden;
+}
+
+/* ── Simulation frame ── */
+
+.frame-panel {
+  flex: 2.2;
+  display: flex;
+  flex-direction: column;
+}
+
+.frame-wrap {
+  flex: 1;
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.frame-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.placeholder {
+  position: absolute;
+  color: var(--muted);
+  font-size: 0.95rem;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.placeholder strong { color: var(--text); }
+
+/* ── Info panel ── */
+
+.info-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 260px;
+  max-width: 320px;
+}
+
+/* ── Cards ── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.card-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* ── Action name ── */
+
+.action-name {
+  font-size: 1.9rem;
+  font-weight: 800;
+  text-align: center;
+  padding: 6px 0 4px;
+  transition: color 0.15s;
+  letter-spacing: 0.02em;
+}
+
+/* ── Probability bars ── */
+
+.prob-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.prob-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prob-label {
+  font-size: 0.7rem;
+  width: 84px;
+  flex-shrink: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.prob-track {
+  flex: 1;
+  height: 9px;
+  background: var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.prob-fill {
+  height: 100%;
+  border-radius: 5px;
+  width: 0%;
+  transition: width 0.14s ease;
+}
+
+.prob-pct {
+  font-size: 0.7rem;
+  width: 36px;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Stats grid ── */
+
+.stats-grid {
+  display: flex;
+  gap: 10px;
+}
+
+.stat-box {
+  flex: 1;
+  background: var(--bg);
+  border-radius: 7px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.stat-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

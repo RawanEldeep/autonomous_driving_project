@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E4 Highway Agent — Live Demo</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <h1>E4 Highway Agent</h1>
+      <p class="subtitle">PPO + Ego-Attention + Entropy Regularization</p>
+    </div>
+    <div class="controls">
+      <button id="btn-start" onclick="startSim()">&#9654; Start</button>
+      <button id="btn-stop"  onclick="stopSim()" disabled>&#9632; Stop</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Left: simulation frame -->
+    <section class="frame-panel">
+      <div class="frame-wrap">
+        <img id="sim-frame" src="" alt="">
+        <div id="frame-placeholder" class="placeholder">
+          <span>Press <strong>Start</strong> to begin the simulation</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: action + probabilities + stats -->
+    <section class="info-panel">
+
+      <div class="card action-card">
+        <div class="card-label">CURRENT ACTION</div>
+        <div id="action-name" class="action-name">—</div>
+      </div>
+
+      <div class="card probs-card">
+        <div class="card-label">ACTION PROBABILITIES</div>
+        <div id="prob-bars" class="prob-bars"></div>
+      </div>
+
+      <div class="card stats-card">
+        <div class="card-label">EPISODE STATS</div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">Episode</div>
+            <div class="stat-value" id="stat-episode">—</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Step</div>
+            <div class="stat-value" id="stat-step">—</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Reward</div>
+            <div class="stat-value" id="stat-reward">—</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    const ACTION_NAMES  = ["LANE_LEFT", "IDLE", "LANE_RIGHT", "FASTER", "SLOWER"];
+    const ACTION_COLORS = ["#4c8ef7", "#3fb950", "#e3a531", "#e05c4b", "#a371f7"];
+
+    let pollingHandle = null;
+
+    // Build probability bar rows once on load
+    const probBars = document.getElementById("prob-bars");
+    ACTION_NAMES.forEach((name, i) => {
+      const row = document.createElement("div");
+      row.className = "prob-row";
+      row.innerHTML = `
+        <div class="prob-label">${name}</div>
+        <div class="prob-track">
+          <div class="prob-fill" id="prob-fill-${i}" style="background:${ACTION_COLORS[i]};width:0%"></div>
+        </div>
+        <div class="prob-pct" id="prob-pct-${i}">0%</div>`;
+      probBars.appendChild(row);
+    });
+
+    function startSim() {
+      fetch("/start", { method: "POST" }).then(() => {
+        document.getElementById("btn-start").disabled = true;
+        document.getElementById("btn-stop").disabled  = false;
+        document.getElementById("frame-placeholder").style.display = "none";
+        pollingHandle = setInterval(poll, 150);
+      });
+    }
+
+    function stopSim() {
+      fetch("/stop", { method: "POST" }).then(() => {
+        clearInterval(pollingHandle);
+        pollingHandle = null;
+        document.getElementById("btn-start").disabled = false;
+        document.getElementById("btn-stop").disabled  = true;
+      });
+    }
+
+    function poll() {
+      fetch("/state")
+        .then(r => r.json())
+        .then(data => {
+          if (!data.running) return;
+
+          // Frame
+          if (data.frame_b64) {
+            document.getElementById("sim-frame").src =
+              "data:image/jpeg;base64," + data.frame_b64;
+          }
+
+          // Action label — highlight the active action color
+          const nameEl = document.getElementById("action-name");
+          nameEl.textContent = data.action || "—";
+          if (data.action_idx !== null) {
+            nameEl.style.color = ACTION_COLORS[data.action_idx];
+          }
+
+          // Probability bars
+          if (data.probs) {
+            data.probs.forEach((p, i) => {
+              const pct = (p * 100).toFixed(1);
+              document.getElementById(`prob-fill-${i}`).style.width = pct + "%";
+              document.getElementById(`prob-pct-${i}`).textContent  = pct + "%";
+            });
+          }
+
+          // Stats
+          document.getElementById("stat-episode").textContent =
+            data.episode !== null ? data.episode : "—";
+          document.getElementById("stat-step").textContent =
+            data.step !== null ? data.step : "—";
+          document.getElementById("stat-reward").textContent =
+            data.cumulative_reward !== null ? data.cumulative_reward : "—";
+        })
+        .catch(() => {/* server not ready yet, skip */});
+    }
+  </script>
+
+</body>
+</html>
