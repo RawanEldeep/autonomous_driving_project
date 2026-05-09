@@ -49,7 +49,7 @@ _ENV_CONFIG = {
         "absolute": False,
     },
     "policy_frequency": 2,
-    "duration": 200,
+    "duration": 100,
     "offscreen_rendering": True,  # render to pygame.Surface directly — no display driver needed
 }
 
