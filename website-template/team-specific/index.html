@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <title>Autonomous Highway Driving Using Deep Reinforcement Learning</title>
+
+  <!-- Bootstrap core CSS -->
+  <link href="../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+  <!-- Navigation -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark static-top">
+    <div class="container">
+      <a class="navbar-brand" href="../home.html">Practical Machine Deep Learning</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarResponsive">
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item active">
+            <a class="nav-link" href="../home.html">Home
+              <span class="sr-only">(current)</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="../about.html">About</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="../contact.html">Contact</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Page Content -->
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-12 text-center">
+        <h1 class="mt-5">Autonomous Highway Driving Using Deep Reinforcement Learning</h1>
+        <ul class="list-unstyled">
+          <li>Rawan Eldeep</li>
+          <li>Jana Elmorsy</li>
+        </ul>
+      </div>
+    </div>
+
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">Problem Statement</h2>
+        <p>
+          Autonomous driving has emerged as one of the most transformative technologies in artificial intelligence. Despite significant progress, autonomous highway driving remains a challenging problem requiring vehicles to make continuous real-time decisions — when to accelerate, decelerate, or change lanes — in a dynamic environment with other moving vehicles, while avoiding collisions and maintaining efficient travel speed.
+        </p>
+        <p>
+          In this project, we train an autonomous driving agent to navigate a multi-lane highway using Deep Reinforcement Learning. The agent learns entirely through trial and error by interacting with a simulated highway environment, receiving rewards for desirable behavior such as maintaining high speed and avoiding collisions, and penalties for undesirable behavior such as crashing or driving too slowly.
+        </p>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">Environment</h2>
+
+        <p>
+          We use highway-env, a lightweight open-source simulation environment for autonomous driving. The agent operates on a 3-lane highway populated with 15 surrounding vehicles. At each timestep, the agent receives a Kinematics observation: a matrix of 10 vehicles &times; 7 features [presence, x, y, vx, vy, cos_h, sin_h], normalized relative to the ego vehicle. The action space is discrete with 5 actions: LANE_LEFT, IDLE, LANE_RIGHT, FASTER, SLOWER.
+        </p>
+
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/environment.png" class="img-fluid text-center">
+        </div>
+        <br/>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">Input/Output Examples</h2>
+
+        <p>
+          The agent receives a 10&times;7 observation matrix representing the ego vehicle and 9 surrounding vehicles. Each row contains the vehicle's presence flag, lateral position (x), longitudinal position (y), lateral velocity (vx), longitudinal velocity (vy), and heading (cos_h, sin_h). Values are normalized relative to the ego vehicle.
+        </p>
+        <p>
+          Based on this observation, the agent outputs one of 5 discrete actions: LANE_LEFT, IDLE, LANE_RIGHT, FASTER, or SLOWER. For example, given a slow vehicle directly ahead, the agent may output LANE_RIGHT with 87% confidence to overtake safely.
+        </p>
+
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/input_output.png" class="img-fluid text-center">
+        </div>
+        <br/>
+      </div>
+    </div>
+
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">State of the art</h2>
+
+        <p>
+          State-of-the-art DRL approaches for autonomous highway driving include:
+        </p>
+        <ul>
+          <li><strong>DQN:</strong> value-based, discrete actions, prone to instability in continuous environments</li>
+          <li><strong>DDPG:</strong> off-policy actor-critic, continuous control, sensitive to hyperparameters</li>
+          <li><strong>SAC (IEDF-SAC variant):</strong> achieved reward of 403.30 with 1.5% collision rate vs baseline SAC reward of 365.85 with 18.83% collision rate</li>
+          <li><strong>PPO:</strong> on-policy actor-critic, stable convergence, strong performance in highway-env</li>
+        </ul>
+
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/sota.png" class="img-fluid text-center">
+        </div>
+        <br/>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">Orignial Model from Literature</h2>
+
+        <p>
+          We selected PPO (Proximal Policy Optimization) with an Ego-Attention (Transformer) policy as our baseline, sourced from the Farama-Foundation HighwayEnv repository. The model uses a custom feature extractor (EgoAttentionNetwork) that embeds each vehicle into a 64-dimensional space, then applies a multi-head attention mechanism (2 heads, 32 features per head) where the ego vehicle queries all surrounding vehicles. The attended output is combined with the ego embedding via a residual connection and passed to PPO's policy and value heads.
+        </p>
+
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/baseline_architecture.png" class="img-fluid text-center">
+        </div>
+        <br/>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">Proposed Updates</h2>
+
+        <p>
+          We propose four targeted enhancements to the baseline PPO + Ego-Attention agent, each addressing a specific limitation identified during analysis.
+        </p>
+
+        <h5 class="mt-5">Update #1: Enhanced Reward Shaping (E1)</h5>
+        <p>
+          The baseline reward function only delivers strong signals at critical moments such as collisions. We augmented it with near-miss penalties using Time-to-Collision (TTC) metrics, smooth driving rewards to encourage gradual acceleration, and lane-centering rewards to incentivize staying centered in the lane.
+        </p>
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/e1.png" class="img-fluid text-center">
+        </div>
+        <br/>
+
+        <h5 class="mt-5">Update #2: Dynamic Traffic Scenarios (E2)</h5>
+        <p>
+          The baseline uses a fixed density of 15 vehicles. We introduced variable traffic conditions: sparse (5&ndash;10 vehicles), moderate (15&ndash;20 vehicles), and dense (25&ndash;30 vehicles), with dynamic events such as sudden braking and aggressive lane changes sampled randomly during training.
+        </p>
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/e2.png" class="img-fluid text-center">
+        </div>
+        <br/>
+
+        <h5 class="mt-5">Update #3: Observation Enrichment (E3)</h5>
+        <p>
+          We expanded the per-vehicle observation from 7 to 10 features by adding pre-computed safety-relevant features: Time-to-Collision (TTC), lateral distance (lat_dist), and lane change in progress (lc_in_progress). This gives the attention mechanism more semantically meaningful inputs.
+        </p>
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/e3.png" class="img-fluid text-center">
+        </div>
+        <br/>
+
+        <h5 class="mt-5">Update #4: Attention Entropy Regularization (E4) &mdash; Best Performing</h5>
+        <p>
+          We added an auxiliary entropy penalty to the PPO training objective to regularize the ego-attention weights, discouraging both over-concentration (attending to a single vehicle exclusively) and over-diffusion (uniform attention regardless of relevance). This encourages the network to maintain structured, selective attention patterns throughout training.
+        </p>
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/e4.png" class="img-fluid text-center">
+        </div>
+        <br/>
+
+      </div>
+    </div>
+
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">Results</h2>
+
+        <p>
+          We ran an ablation study comparing all enhancements individually and in combination against the baseline. Key findings:
+        </p>
+        <ul>
+          <li><strong>Baseline:</strong> Mean Reward 54.53 &plusmn; 7.49, Collision Rate 5.0%, Success Rate 95.0%</li>
+          <li><strong>E1 (Reward Shaping):</strong> collapsed due to reward hacking</li>
+          <li><strong>E4 (Attention Regularization):</strong> best performing individual enhancement</li>
+          <li><strong>E3 (Observation Enrichment):</strong> close second</li>
+          <li><strong>All enhancements combined:</strong> underperformed individual winners due to conflicting optimization signals</li>
+        </ul>
+
+        <br/>
+        <div class="img-container" align="center">
+          <img src="resources/images/results.png" class="img-fluid text-center">
+        </div>
+        <br/>
+      </div>
+    </div>
+
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">Technical report</h2>
+
+        <p>
+          Details related to training and implementation:
+        </p>
+
+        <ul>
+          <li><strong>Framework:</strong> Stable-Baselines3 (PPO), highway-env (gymnasium), PyTorch</li>
+          <li><strong>Training hardware:</strong> Google Colab (GPU)</li>
+          <li><strong>Total timesteps per model:</strong> 200,000</li>
+          <li><strong>Number of models trained:</strong> 6 (baseline + 4 individual enhancements + all combined)</li>
+          <li><strong>Hyperparameter search:</strong> conducted on E4 configuration</li>
+          <li><strong>Difficulties:</strong> reward hacking in E1, conflicting optimization signals when combining enhancements, Colab session time limits during multi-model ablation</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">Conclusion</h2>
+
+        <p>
+          The ablation study demonstrated that targeted, single-objective enhancements outperform combined approaches in DRL for autonomous driving. E4 (Attention Entropy Regularization) was the strongest enhancement, producing more structured attention patterns and better driving behavior. Key lessons learned: reward design is critical and small changes cause drastic behavioral shifts; combining enhancements requires careful conflict analysis; and regularizing the attention mechanism improves both performance and interpretability. Future work includes testing on more complex environments (roundabouts, intersections) and combining E3+E4 with a carefully tuned joint reward function.
+        </p>
+
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-lg-12 text-left">
+        <h2 class="mt-5">References</h2>
+
+        <ol>
+          <li>Farama-Foundation. HighwayEnv: A minimalist environment for highway driving. <a href="https://github.com/Farama-Foundation/HighwayEnv">https://github.com/Farama-Foundation/HighwayEnv</a></li>
+          <li>Schulman et al. Proximal Policy Optimization Algorithms. <a href="https://arxiv.org/abs/1707.06347">arXiv:1707.06347</a></li>
+          <li>Ji &amp; Ding et al. Application of SAC Algorithm with an Image-Enhanced Data Framework for Autonomous Driving in Highway. 2026.</li>
+          <li>Delavari et al. Survey of evaluation metrics for autonomous driving DRL.</li>
+          <li>Dong et al. Collision rate as safety metric in DRL evaluation.</li>
+          <li>OpenAI Spinning Up. Soft Actor-Critic. <a href="https://spinningup.openai.com/en/latest/algorithms/sac.html">https://spinningup.openai.com/en/latest/algorithms/sac.html</a></li>
+        </ol>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bootstrap core JavaScript -->
+  <script src="../vendor/jquery/jquery.slim.min.js"></script>
+  <script src="../vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+</body>
+
+</html>
