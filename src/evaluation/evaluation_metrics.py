@@ -1,124 +1,59 @@
-"""
-Comprehensive evaluation metrics for autonomous driving PPO models.
-
-Computes all 8 metrics specified in the project proposal:
-    1. Cumulative Reward       — Σ r_t per episode
-    2. Learning Efficiency     — timesteps to reach target reward
-    3. Collision Rate          — N_collisions / N_episodes × 100 %
-    4. Success Rate            — N_success / N_episodes × 100 %
-    5. Lane Deviation          — |y_vehicle − y_lane_center| (not lane-changing)
-    6. Average Speed           — (1/T) Σ v_t, plus variance
-    7. Jerk                    — normalised acceleration and steering rate
-    8. Driving Distance        — Σ ‖p_t − p_{t-1}‖
-
-Usage example:
-    evaluator = MetricsEvaluator(env, model, n_episodes=100)
-    agg = evaluator.evaluate()
-    evaluator.save_metrics(agg, "results/enhanced_metrics.json")
-
-    plotter = MetricsPlotter(save_dir="results")
-    plotter.plot_all(baseline_agg, enhanced_agg,
-                     baseline_episodes=evaluator.episode_metrics,
-                     enhanced_episodes=evaluator.episode_metrics)
-"""
-
 import json
 import os
 import numpy as np
 import matplotlib
-matplotlib.use("Agg")           # headless-safe backend
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional
 
 
-# =============================================================================
-# Data containers
-# =============================================================================
-
 @dataclass
 class EpisodeMetrics:
-    """Raw per-step data collected during one evaluation episode."""
-    # Scalar episode outcomes
     cumulative_reward: float = 0.0
     collided: bool = False
     success: bool = False
     timesteps: int = 0
     traffic_scenario: str = "unknown"
 
-    # Per-step sequences
     speeds: List[float] = field(default_factory=list)
-    positions: List[object] = field(default_factory=list)   # np.ndarray per step
+    positions: List[object] = field(default_factory=list)
     lane_deviations: List[float] = field(default_factory=list)
-    accelerations: List[float] = field(default_factory=list)  # Δv proxy
-    steerings: List[float] = field(default_factory=list)       # Δsteering
+    accelerations: List[float] = field(default_factory=list)
+    steerings: List[float] = field(default_factory=list)
 
 
 @dataclass
 class AggregatedMetrics:
-    """Summary statistics computed across all evaluation episodes."""
     n_episodes: int = 0
 
-    # 1. Cumulative reward
     mean_reward: float = 0.0
     std_reward: float = 0.0
     min_reward: float = 0.0
     max_reward: float = 0.0
 
-    # 3 & 4. Collision / success
-    collision_rate: float = 0.0   # percentage
-    success_rate: float = 0.0     # percentage
+    collision_rate: float = 0.0
+    success_rate: float = 0.0
 
-    # 5. Lane deviation (metres)
     mean_lane_deviation: float = 0.0
     max_lane_deviation: float = 0.0
 
-    # 6. Speed (m/s)
     mean_speed: float = 0.0
     speed_variance: float = 0.0
 
-    # 7. Jerk (normalised, dimensionless)
     mean_jerk: float = 0.0
     max_jerk: float = 0.0
 
-    # 8. Driving distance (metres)
     mean_distance: float = 0.0
     total_distance: float = 0.0
 
-    # 2. Learning efficiency (filled externally from training logs)
     timesteps_to_target: Optional[int] = None
 
 
-# =============================================================================
-# Evaluator
-# =============================================================================
-
 class MetricsEvaluator:
-    """
-    Runs a trained model for N episodes on a highway-env environment and
-    computes all 8 proposal metrics.
 
-    The evaluator is model-agnostic: it only calls ``model.predict`` and
-    reads vehicle state from ``env.unwrapped.vehicle``.
-
-    Parameters
-    ----------
-    env : gymnasium.Env
-        A single (non-vectorised) highway-env instance.
-    model : stable_baselines3 PPO (or any model with .predict())
-    n_episodes : int
-        Number of evaluation episodes (proposal default: 100).
-    target_reward : float
-        Threshold for the learning-efficiency metric.
-    target_window : int
-        Consecutive episodes that must exceed ``target_reward``.
-    render : bool
-        Whether to call env.render() each step.
-    """
-
-    # Jerk normalisation constants
-    _A_RANGE = 10.0    # m/s²  (5 − (−5))
-    _W_RANGE = 1.0     # rad/s (0.5 − (−0.5))
+    _A_RANGE = 10.0
+    _W_RANGE = 1.0
 
     def __init__(
         self,
@@ -138,12 +73,7 @@ class MetricsEvaluator:
 
         self.episode_metrics: List[EpisodeMetrics] = []
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def evaluate(self) -> AggregatedMetrics:
-        """Run all episodes and return aggregated metrics."""
         self.episode_metrics = []
 
         for ep_idx in range(self.n_episodes):
@@ -164,16 +94,11 @@ class MetricsEvaluator:
         return self._aggregate()
 
     def save_metrics(self, metrics: AggregatedMetrics, path: str):
-        """Serialise aggregated metrics to a JSON file."""
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         data = asdict(metrics)
         with open(path, "w") as f:
             json.dump(data, f, indent=2, default=str)
         print(f"Metrics saved → {path}")
-
-    # ------------------------------------------------------------------
-    # Episode runner
-    # ------------------------------------------------------------------
 
     def _run_episode(self) -> EpisodeMetrics:
         obs, info = self.env.reset()
@@ -196,32 +121,26 @@ class MetricsEvaluator:
 
             ego = self.env.unwrapped.vehicle
 
-            # --- Speed ---
             ep.speeds.append(float(ego.speed))
 
-            # --- Position (for driving distance) ---
             ep.positions.append(ego.position.copy())
 
-            # --- Lane deviation (skip while lane-changing) ---
             if not self._is_lane_changing(ego):
                 dev = self._lane_deviation(ego)
                 if dev is not None:
                     ep.lane_deviations.append(dev)
 
-            # --- Acceleration proxy (Δvx) ---
             curr_vx = float(ego.velocity[0]) if hasattr(ego, "velocity") else float(ego.speed)
             if prev_vx is not None:
                 ep.accelerations.append(curr_vx - prev_vx)
             prev_vx = curr_vx
 
-            # --- Steering delta (continuous action only) ---
             if hasattr(action, "__len__") and getattr(action, 'ndim', 0) > 0 and len(action) > 1:
                 steer = float(action[1])
                 if prev_steer is not None:
                     ep.steerings.append(steer - prev_steer)
                 prev_steer = steer
 
-            # --- Collision flag ---
             if info.get("crashed", False):
                 ep.collided = True
 
@@ -230,20 +149,12 @@ class MetricsEvaluator:
         ep.success = not ep.collided
         return ep
 
-    # ------------------------------------------------------------------
-    # Per-episode helpers
-    # ------------------------------------------------------------------
-
     def _is_lane_changing(self, vehicle) -> bool:
         if not hasattr(vehicle, "target_lane_index"):
             return False
         return vehicle.lane_index != vehicle.target_lane_index
 
     def _lane_deviation(self, vehicle) -> Optional[float]:
-        """
-        Lateral distance (m) from vehicle centre to lane centre.
-        Returns None on error.
-        """
         try:
             road = self.env.unwrapped.road
             lane = road.network.get_lane(vehicle.lane_index)
@@ -257,15 +168,6 @@ class MetricsEvaluator:
         accelerations: List[float],
         steerings: List[float],
     ):
-        """
-        Metric 7 — Jerk.
-
-            J_acc   = |Δa_t| / (a_max − a_min)
-            J_steer = |Δw_t| / (w_max − w_min)
-            J_total = (J_acc + J_steer) / 2
-
-        Returns (mean_jerk, max_jerk).
-        """
         j_accs = [
             abs(accelerations[i] - accelerations[i - 1]) / self._A_RANGE
             for i in range(1, len(accelerations))
@@ -284,7 +186,6 @@ class MetricsEvaluator:
         return float(np.mean(j_total)), float(np.max(j_total))
 
     def _driving_distance(self, positions: list) -> float:
-        """Metric 8 — total path length in metres."""
         if len(positions) < 2:
             return 0.0
         return float(
@@ -293,10 +194,6 @@ class MetricsEvaluator:
                 for i in range(1, len(positions))
             )
         )
-
-    # ------------------------------------------------------------------
-    # Aggregation
-    # ------------------------------------------------------------------
 
     def _aggregate(self) -> AggregatedMetrics:
         agg = AggregatedMetrics(n_episodes=len(self.episode_metrics))
@@ -336,30 +233,12 @@ class MetricsEvaluator:
         return agg
 
 
-# =============================================================================
-# Learning efficiency helper
-# =============================================================================
-
 def compute_learning_efficiency(
     reward_log: List[float],
     target_reward: float = 30.0,
     window: int = 10,
     timestep_interval: int = 1,
 ) -> Optional[int]:
-    """
-    Metric 2 — Learning Efficiency.
-
-    Scans a list of episode rewards (ordered chronologically) and returns the
-    index of the first episode at which the rolling mean over `window` episodes
-    exceeds `target_reward` and stays above it.
-
-    Parameters
-    ----------
-    reward_log : list of per-episode rewards from training callbacks.
-    timestep_interval : multiply episode index by this to convert to timesteps.
-
-    Returns None if the target was never reached.
-    """
     if len(reward_log) < window:
         return None
     for i in range(window - 1, len(reward_log)):
@@ -368,24 +247,11 @@ def compute_learning_efficiency(
     return None
 
 
-# =============================================================================
-# Plotter
-# =============================================================================
-
 class MetricsPlotter:
-    """
-    Generates all comparison plots specified in the proposal.
-
-    All figures are saved as PNG files under ``save_dir``.
-    """
 
     def __init__(self, save_dir: str = "results"):
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
-
-    # ------------------------------------------------------------------
-    # Convenience: generate every plot in one call
-    # ------------------------------------------------------------------
 
     def plot_all(
         self,
@@ -402,17 +268,12 @@ class MetricsPlotter:
             self.plot_jerk_profile(baseline_episodes, enhanced_episodes)
         self.print_summary_table(baseline, enhanced)
 
-    # ------------------------------------------------------------------
-    # Individual plots
-    # ------------------------------------------------------------------
-
     def plot_learning_curves(
         self,
         baseline_rewards: List[float],
         enhanced_rewards: List[float],
         timestep_interval: int = 1000,
     ):
-        """Metric 2 — reward vs training timesteps (smoothed line plot)."""
         fig, ax = plt.subplots(figsize=(10, 5))
 
         def _smooth(data, w=10):
@@ -444,7 +305,6 @@ class MetricsPlotter:
     def plot_bar_comparison(
         self, baseline: AggregatedMetrics, enhanced: AggregatedMetrics
     ):
-        """Metrics 3 & 4 — collision rate and success rate bar charts."""
         fig, axes = plt.subplots(1, 2, figsize=(10, 5))
         cats = ["Baseline", "Enhanced"]
         colors = ["steelblue", "darkorange"]
@@ -476,7 +336,6 @@ class MetricsPlotter:
         baseline_eps: List[EpisodeMetrics],
         enhanced_eps: List[EpisodeMetrics],
     ):
-        """Metric 1 — histogram of episode cumulative rewards."""
         fig, ax = plt.subplots(figsize=(10, 5))
         b_rewards = [ep.cumulative_reward for ep in baseline_eps]
         e_rewards = [ep.cumulative_reward for ep in enhanced_eps]
@@ -495,7 +354,6 @@ class MetricsPlotter:
         baseline_eps: List[EpisodeMetrics],
         enhanced_eps: List[EpisodeMetrics],
     ):
-        """Metric 5 — box plot of lane deviations."""
         b_devs = [d for ep in baseline_eps for d in ep.lane_deviations]
         e_devs = [d for ep in enhanced_eps for d in ep.lane_deviations]
 
@@ -525,7 +383,6 @@ class MetricsPlotter:
         enhanced_eps: List[EpisodeMetrics],
         episode_idx: int = 0,
     ):
-        """Metric 6 — speed time series for a representative episode."""
         fig, ax = plt.subplots(figsize=(10, 5))
         if episode_idx < len(baseline_eps):
             ax.plot(
@@ -551,7 +408,6 @@ class MetricsPlotter:
         enhanced_eps: List[EpisodeMetrics],
         episode_idx: int = 0,
     ):
-        """Metric 7 — normalised jerk time series."""
 
         def _jerk_series(accels, a_range=10.0):
             return [
@@ -577,10 +433,6 @@ class MetricsPlotter:
         ax.grid(True, alpha=0.3)
         plt.tight_layout()
         self._save("jerk_profile.png")
-
-    # ------------------------------------------------------------------
-    # Summary table (terminal output)
-    # ------------------------------------------------------------------
 
     def print_summary_table(
         self, baseline: AggregatedMetrics, enhanced: AggregatedMetrics
@@ -610,10 +462,6 @@ class MetricsPlotter:
             print(f"{name:<30} {b_val:>16} {e_val:>16}")
 
         print("=" * W + "\n")
-
-    # ------------------------------------------------------------------
-    # Internal
-    # ------------------------------------------------------------------
 
     def _save(self, filename: str):
         path = os.path.join(self.save_dir, filename)

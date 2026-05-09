@@ -1,31 +1,3 @@
-"""
-Complete training pipeline for the Enhanced PPO autonomous driving agent.
-
-Implements all 5 enhancements from the academic proposal and runs a full
-baseline-vs-enhanced comparison.  Every enhancement can be toggled via
-ENHANCEMENT_CONFIG flags, enabling clean ablation studies.
-
-Usage (command line):
-    # Full pipeline (train baseline + enhanced, then evaluate both):
-    python scripts/train_enhanced.py --mode full
-
-    # Train enhanced only (all enhancements on):
-    python scripts/train_enhanced.py --mode train_enhanced
-
-    # Evaluate pre-trained models:
-    python scripts/train_enhanced.py --mode evaluate
-
-    # Ablation — disable specific enhancements:
-    python scripts/train_enhanced.py --mode train_enhanced --no-reward --no-obs
-
-    # Enable hyperparameter search before training:
-    python scripts/train_enhanced.py --mode train_enhanced --hp-search
-
-Google Colab tip:
-    Add  !python scripts/train_enhanced.py --mode full --timesteps 200000
-    to a code cell.  GPU is auto-detected.
-"""
-
 import argparse
 import os
 import sys
@@ -40,7 +12,6 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 import highway_env  # noqa: F401  — registers highway-v0
 
-# Make project root importable when running from any directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.baseline_model import (
@@ -62,34 +33,27 @@ from src.evaluation.evaluation_metrics import (
 from src.training.hyperparameter_search import random_search, print_ranked_results
 
 
-# =============================================================================
-# Global configuration
-# =============================================================================
-
-# --- Enhancement toggles (ablation study flags) ---
 ENHANCEMENT_CONFIG = {
-    "enhanced_reward":        True,   # Enhancement 1: TTC + smooth + lane-center
-    "dynamic_traffic":        True,   # Enhancement 2: sparse/moderate/dense density
-    "observation_enrichment": True,   # Enhancement 3: 7 → 10 features per vehicle
-    "attention_reg":          True,   # Enhancement 4: entropy penalty on attention
-    "hp_search":              False,  # Enhancement 5: set True to run HP search
+    "enhanced_reward":        True,
+    "dynamic_traffic":        True,
+    "observation_enrichment": True,
+    "attention_reg":          True,
+    "hp_search":              False,
 }
 
-# --- Training hyperparameters ---
 TRAIN_CONFIG = {
-    "n_cpu":            4,         # parallel envs (reduce to 1 on Colab free tier)
+    "n_cpu":            4,
     "total_timesteps":  200_000,
     "eval_freq":        10_000,
     "n_eval_episodes":  10,
     "checkpoint_freq":  50_000,
     "seed":             42,
-    "use_gpu":          True,      # auto-detected at runtime
+    "use_gpu":          True,
     "log_dir":          "enhanced_ppo_logs",
     "baseline_save":    "enhanced_ppo_logs/baseline_model",
     "enhanced_save":    "enhanced_ppo_logs/enhanced_model",
 }
 
-# --- Attention network kwargs: baseline (7 features) vs enhanced (10 features) ---
 _BASELINE_ATTN_KWARGS = dict(
     in_size=7 * 15,
     embedding_layer_kwargs={"in_size": 7, "layer_sizes": [64, 64], "reshape": False},
@@ -103,15 +67,7 @@ _ENHANCED_ATTN_KWARGS = dict(
 )
 
 
-# =============================================================================
-# Environment factories
-# =============================================================================
-
 def make_baseline_env(**kwargs):
-    """
-    Standard highway-v0 environment with no enhancements.
-    Used for baseline training and for loading the baseline model at evaluation.
-    """
     env = gym.make(
         kwargs.get("id", "highway-v0"),
         config=kwargs.get("config", env_kwargs["config"]),
@@ -121,16 +77,6 @@ def make_baseline_env(**kwargs):
 
 
 def make_enhanced_env(enhancements=None, **kwargs):
-    """
-    highway-v0 with the requested enhancements layered as gymnasium wrappers.
-
-    Wrapper order matters:
-        1. DynamicTrafficWrapper  — changes how reset() samples vehicle count
-        2. ObservationEnrichmentWrapper — changes observation space (7 → 10 features)
-        3. EnhancedRewardWrapper  — augments the step reward
-
-    The CustomExtractor must match the observation features_per_vehicle.
-    """
     if enhancements is None:
         enhancements = ENHANCEMENT_CONFIG
 
@@ -143,7 +89,6 @@ def make_enhanced_env(enhancements=None, **kwargs):
     )
     env.reset()
 
-    # Enhancement 2 — Dynamic traffic
     if enhancements.get("dynamic_traffic"):
         env = DynamicTrafficWrapper(
             env,
@@ -152,11 +97,9 @@ def make_enhanced_env(enhancements=None, **kwargs):
             event_probability=0.02,
         )
 
-    # Enhancement 3 — Observation enrichment (7 → 10 features)
     if enhancements.get("observation_enrichment"):
         env = ObservationEnrichmentWrapper(env, vehicles_count=vehicles_count)
 
-    # Enhancement 1 — Enhanced reward shaping
     if enhancements.get("enhanced_reward"):
         env = EnhancedRewardWrapper(
             env,
@@ -169,15 +112,7 @@ def make_enhanced_env(enhancements=None, **kwargs):
     return env
 
 
-# =============================================================================
-# TensorBoard reward logger callback
-# =============================================================================
-
 class _RewardLogger(BaseCallback):
-    """
-    Records per-episode rewards and enhancement-specific sub-rewards to
-    TensorBoard during training.
-    """
 
     def __init__(self, verbose: int = 0):
         super().__init__(verbose)
@@ -198,12 +133,7 @@ class _RewardLogger(BaseCallback):
         return True
 
 
-# =============================================================================
-# Training functions
-# =============================================================================
-
 def train_baseline(config: dict = TRAIN_CONFIG) -> PPO:
-    """Train the baseline PPO model (no enhancements)."""
     print("\n" + "=" * 55)
     print("  Training BASELINE model")
     print("=" * 55)
@@ -258,12 +188,6 @@ def train_enhanced(
     config: dict = TRAIN_CONFIG,
     enhancements: dict = ENHANCEMENT_CONFIG,
 ) -> PPO:
-    """
-    Train the enhanced PPO model with the selected enhancements.
-
-    If hp_search is enabled (Enhancement 5), a random hyperparameter search
-    is run first and the best config is used for the full training run.
-    """
     print("\n" + "=" * 55)
     print("  Training ENHANCED model")
     active = [k for k, v in enhancements.items() if v]
@@ -274,15 +198,12 @@ def train_enhanced(
     device = _device(config)
     print(f"  Device: {device}")
 
-    # ------------------------------------------------------------------ #
-    # Enhancement 5 — Hyperparameter search
-    # ------------------------------------------------------------------ #
     if enhancements.get("hp_search"):
         print("\n  Running hyperparameter search (Enhancement 5)…")
         best_hp, all_hp_results = random_search(
             env_fn=lambda: make_enhanced_env(enhancements=enhancements, **env_kwargs),
             n_configs=12,
-            total_timesteps=30_000,   # quick budget per config on Colab
+            total_timesteps=30_000,
             log_dir=os.path.join(config["log_dir"], "hp_search"),
             seed=config["seed"],
         )
@@ -293,13 +214,9 @@ def train_enhanced(
         ent_coef   = best_hp.get("ent_coef", 0.01)
         gamma      = best_hp.get("gamma", 0.99)
     else:
-        # Sensible defaults when not searching
         lr, batch_size, n_steps = 2e-3, 64, 512
         ent_coef, gamma = 0.01, 0.99
 
-    # ------------------------------------------------------------------ #
-    # Feature extractor: use 10-feature kwargs if observation enriched
-    # ------------------------------------------------------------------ #
     attn_kwargs = (
         _ENHANCED_ATTN_KWARGS
         if enhancements.get("observation_enrichment")
@@ -318,9 +235,6 @@ def train_enhanced(
         env_kwargs={"enhancements": enhancements, **env_kwargs},
     )
 
-    # ------------------------------------------------------------------ #
-    # Enhancement 4 — Use AttentionRegularizedPPO if requested
-    # ------------------------------------------------------------------ #
     ModelClass = (
         AttentionRegularizedPPO if enhancements.get("attention_reg") else PPO
     )
@@ -366,19 +280,11 @@ def train_enhanced(
     return model
 
 
-# =============================================================================
-# Evaluation & comparison
-# =============================================================================
-
 def evaluate_and_compare(
     config: dict = TRAIN_CONFIG,
     enhancements: dict = ENHANCEMENT_CONFIG,
     n_eval_episodes: int = 100,
 ) -> dict:
-    """
-    Load both trained models, run evaluation, generate all plots, and print
-    the comparison table.
-    """
     print("\n" + "=" * 55)
     print("  Evaluation")
     print("=" * 55)
@@ -389,9 +295,6 @@ def evaluate_and_compare(
 
     outcomes = {}
 
-    # ------------------------------------------------------------------ #
-    # Evaluate baseline
-    # ------------------------------------------------------------------ #
     baseline_path = config["baseline_save"] + ".zip"
     baseline_agg, baseline_eps = None, None
 
@@ -413,9 +316,6 @@ def evaluate_and_compare(
     else:
         print(f"  Baseline model not found at {baseline_path} — skipping.")
 
-    # ------------------------------------------------------------------ #
-    # Evaluate enhanced
-    # ------------------------------------------------------------------ #
     enhanced_path = config["enhanced_save"] + ".zip"
     enhanced_agg, enhanced_eps = None, None
 
@@ -440,9 +340,6 @@ def evaluate_and_compare(
     else:
         print(f"  Enhanced model not found at {enhanced_path} — skipping.")
 
-    # ------------------------------------------------------------------ #
-    # Generate plots and summary table
-    # ------------------------------------------------------------------ #
     if baseline_agg and enhanced_agg:
         print("\n  Generating comparison plots…")
         plotter.plot_all(
@@ -459,19 +356,11 @@ def evaluate_and_compare(
     return outcomes
 
 
-# =============================================================================
-# Internal helpers
-# =============================================================================
-
 def _device(config: dict) -> str:
     if config.get("use_gpu") and torch.cuda.is_available():
         return "cuda"
     return "cpu"
 
-
-# =============================================================================
-# Entry point
-# =============================================================================
 
 def _parse_args():
     parser = argparse.ArgumentParser(
@@ -494,7 +383,6 @@ def _parse_args():
     parser.add_argument("--n-cpu", type=int, default=4,
                         help="Number of parallel envs (use 1 on Colab free tier)")
 
-    # Enhancement toggles
     parser.add_argument("--no-reward",  dest="enhanced_reward",        action="store_false")
     parser.add_argument("--no-traffic", dest="dynamic_traffic",        action="store_false")
     parser.add_argument("--no-obs",     dest="observation_enrichment", action="store_false")
@@ -514,7 +402,6 @@ def _parse_args():
 if __name__ == "__main__":
     args = _parse_args()
 
-    # Override global configs from CLI
     TRAIN_CONFIG["total_timesteps"] = args.timesteps
     TRAIN_CONFIG["n_cpu"] = args.n_cpu
 
